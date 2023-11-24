@@ -127,7 +127,7 @@ def parse_enums(enums: list[EnumDescriptorProto], ctx: ParseContext, parent_mess
         ctx.package.enums.sort(key=lambda e: e.name)
 
 
-def parse_field(field: FieldDescriptorProto, ctx: ParseContext):
+def parse_field(field: FieldDescriptorProto, containing_message: DescriptorProto, ctx: ParseContext):
     mf = MessageField()
     mf.name = field.name
     mf.number = field.number
@@ -145,6 +145,9 @@ def parse_field(field: FieldDescriptorProto, ctx: ParseContext):
             mf.type = f"map<{entry_nested_type.fields[0].type}, {entry_nested_type.fields[1].type}>"
             mf.full_type = f"map<{entry_nested_type.fields[0].type}, {entry_nested_type.fields[1].type}>"
             mf.label = ""
+
+    if field.HasField("oneof_index"):
+        mf.oneof_name = containing_message.oneof_decl[field.oneof_index].name
 
     return mf
 
@@ -179,7 +182,7 @@ def parse_message(message: DescriptorProto, ctx: ParseContext, parent_message, n
 
     m.is_map_entry = message.options.map_entry
     for i, mf in enumerate(message.field):
-        m.fields.append(parse_field(mf, ctx.ExtendPath(COMMENT_MESSAGE_FIELD_INDEX, i)))
+        m.fields.append(parse_field(mf, message, ctx.ExtendPath(COMMENT_MESSAGE_FIELD_INDEX, i)))
 
     if config.member_ordering == MemberOrdering.ALPHABETICAL:
         m.fields.sort(key=lambda mf: mf.number)
@@ -407,4 +410,4 @@ def markdown_to_html(md: str):
     if all(map(lambda l: l == "" or l.startswith(" "), md.split("\n")[1:])):
         md = re.sub(r"^ ", r"", md, flags=re.MULTILINE)
 
-    return markdown.markdown(md, extensions=['fenced_code'])
+    return markdown.markdown(md, extensions=['prependnewline', 'tables', 'fenced_code', 'codehilite'])
